@@ -35,9 +35,9 @@ __global__ rgba_to_greyscale(const uchar4* const rgbaImage,
         unsigned char B = rgbaImage[idx].z;
 
         //using the formula
-        float gray = R*0.299f + G*0.587f + B*0.114f;
+        float grey = R*0.299f + G*0.587f + B*0.114f;
 
-        greyImage[idxd]=(unsigned char) gray;
+        greyImage[idxd]=(unsigned char) grey;
     }
 
 }
