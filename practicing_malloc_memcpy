@@ -1,0 +1,46 @@
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <cstring>
+#include <time.h>
+
+//kernel
+__global__ void mem_trsf_test(int *input){
+    int GID = blockIdx.x*blockDim.x+threadIdx.x;
+    printf("tid: %d, gid = %d , value = %d, \n", threadIdx.x, GID, input[GID]);
+}
+
+int main(){
+    //size of the array
+    int size= 128;
+    //this gets the size of the storage of arrays 
+    int byte_size=size*sizeof(int);
+    
+    int * h_input; //host variable of the input 
+
+    h_input = (int*) malloc(byte_size); //helps bassically stores a specified number of bytes in computer memory
+
+    time_t t;
+    srand((unsigned)time (&t) );
+    for(int i=0; i<size; i++){
+        h_input[i] =(int)  (rand() & 0xff);
+    }
+
+    int *d_input;
+    cudaMalloc((void**) &d_input, byte_size);
+
+    cudaMemcpy(d_input, h_input, byte_size, cudaMemcpyHostToDevice);
+
+    dim3 block(64);//number of threads per block s
+    dim3 grid(2);//number of block s
+
+    mem_trsf_test<<<grid, block>>>(d_input);
+    cudaDeviceSynchronize();
+
+    cudaFree(d_input);
+    free(h_input);
+
+    cudaDeviceReset();
+    return 0;
+}
