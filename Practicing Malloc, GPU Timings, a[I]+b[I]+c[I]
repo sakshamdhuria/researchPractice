@@ -1,0 +1,101 @@
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <cstring>
+#include <time.h>
+
+// Kernel
+__global__ void sum_arrays_gpu(int *a, int *b, int *c, int *d, int size) {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if (index < size) {
+        d[index] = a[index] + b[index] + c[index];
+    }
+}
+
+void sum_arrays_cpu(int *a, int *b, int *c, int *d, int size) {
+    for (int i = 0; i < size; i++) {
+        d[i] = a[i] + b[i] + c[i];
+    }
+}
+
+int main() {
+    int size = 2 << 22;
+    int block_size;
+    int byte_size = size * sizeof(int);
+
+    int *h_a, *h_b, *h_c, *gpu_results, *cpu_results;
+
+    // Allocate host memory
+    h_a = (int *)malloc(byte_size);
+    h_b = (int *)malloc(byte_size);
+    h_c = (int *)malloc(byte_size);
+    gpu_results = (int *)malloc(byte_size);
+    cpu_results = (int *)malloc(byte_size);
+
+    time_t t;
+    srand((unsigned)time(&t));
+
+    // Initialize host arrays
+    for (int i = 0; i < size; i++) {
+        h_a[i] = (int)(rand() & 0xff);
+        h_b[i] = (int)(rand() & 0xff);
+        h_c[i] = (int)(rand() & 0xff);
+    }
+
+    memset(gpu_results, 0, byte_size);
+    memset(cpu_results, 0, byte_size);
+
+    // CPU summation
+    clock_t cpu_start, cpu_end;
+    cpu_start = clock();
+    sum_arrays_cpu(h_a, h_b, h_c, cpu_results, size);
+    cpu_end = clock();
+    printf("CPU Execution Time: %f seconds\n", ((double)(cpu_end - cpu_start)) / CLOCKS_PER_SEC);
+
+    int *d_a, *d_b, *d_c, *d_d;
+
+    // Allocate device memory
+    cudaMalloc((void **)&d_a, byte_size);
+    cudaMalloc((void **)&d_b, byte_size);
+    cudaMalloc((void **)&d_c, byte_size);
+    cudaMalloc((void **)&d_d, byte_size);
+
+    // Copy data from host to device
+    cudaMemcpy(d_a, h_a, byte_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_b, h_b, byte_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_c, h_c, byte_size, cudaMemcpyHostToDevice);
+
+    dim3 grid;
+    dim3 block;
+
+    // Measure GPU execution time with different block sizes
+    for (block_size = 64; block_size <= 512; block_size *= 2) {
+        block.x = block_size;
+        grid.x = (size + block_size - 1) / block_size;
+
+        clock_t gpu_start, gpu_end;
+        gpu_start = clock();
+        sum_arrays_gpu<<<grid, block>>>(d_a, d_b, d_c, d_d, size);
+        cudaDeviceSynchronize();
+        gpu_end = clock();
+
+        printf("%d block size: GPU Execution Time: %f seconds\n", block_size, ((double)(gpu_end - gpu_start)) / CLOCKS_PER_SEC);
+    }
+
+    // Free device memory
+    cudaFree(d_a);
+    cudaFree(d_b);
+    cudaFree(d_c);
+    cudaFree(d_d);
+
+    // Free host memory
+    free(h_a);
+    free(h_b);
+    free(h_c);
+    free(gpu_results);
+    free(cpu_results);
+
+    cudaDeviceReset();
+    return 0;
+}
