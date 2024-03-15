@@ -39,7 +39,7 @@ int main() {
     dim3 block(arrSize);
     dim3 grid(1);
 
-    map_p1 <<<block, grid>>> (d_a, d_output, arrSize);
+    map_p1 <<<grid, block>>> (d_a, d_output, arrSize);
 
     cudaMemcpy(output, d_output, byte_size, cudaMemcpyDeviceToHost);
 
