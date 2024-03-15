@@ -1,0 +1,58 @@
+#include "cuda_runtime.h"
+#include <stdio.h>
+
+
+
+
+// puzzle 3 guards: Implement a kernel that adds 10 to each position of a and stores it in out. 
+// You have more threads than positions.
+__global__ void map_p1(int *a, int *output, int size) {
+    int threadIndex=blockIdx.x*blockDim.x+threadIdx.x;
+    if(threadIndex<size){
+        output[threadIndex] = a[threadIndex]+10;
+    }
+
+}
+
+
+
+int main() {
+    
+    int arrSize = 32;
+    int byte_size = arrSize*sizeof(int);
+
+    //creating a vector a and the output
+    int *a = (int *) malloc(byte_size);
+    int *output = (int *) malloc(byte_size);
+
+
+    for(int i=0; i<arrSize; i++){
+        a[i]=i;
+    }
+
+    int *d_a, *d_output;
+    cudaMalloc((void **) &d_a, byte_size);
+    cudaMalloc((void **) &d_output, byte_size);
+
+    cudaMemcpy(d_a, a, byte_size, cudaMemcpyHostToDevice);
+
+    dim3 block(arrSize*4);
+    dim3 grid(1);
+
+    map_p1 <<<grid, block>>> (d_a, d_output, arrSize);
+
+    cudaMemcpy(output, d_output, byte_size, cudaMemcpyDeviceToHost);
+
+    for(int i = 0; i<arrSize; i++){
+         printf("i: %d, a[i]: %d, out[i]: %d \n", i, a[i], output[i]);
+    }
+
+    free(a);
+    free(output);
+
+    cudaFree(d_a);
+    cudaFree(d_output);
+
+    cudaDeviceReset();
+    return 0;
+}
