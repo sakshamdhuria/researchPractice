@@ -1,0 +1,64 @@
+#include "cuda_runtime.h"
+#include <stdio.h>
+
+
+
+
+//puzzle 2 ZIP: Implement a kernel that adds together each position of a and b and stores it in out. 
+//You have 1 thread per position.
+__global__ void zip_p2(int *a, int *b, int *output, int size) {
+    int globalThreadId = blockIdx.x*blockDim.x+threadIdx.x;
+
+    if (globalThreadId<size){
+        output[globalThreadId]=a[globalThreadId]+b[globalThreadId];
+    }
+}
+
+
+
+int main() {
+    
+    int arrSize = 32;
+    int byte_size = arrSize*sizeof(int);
+
+    //creating vector a, b and the output
+    int *a = (int *) malloc(byte_size);
+    int *b = (int *) malloc(byte_size);
+    int *output = (int *) malloc(byte_size);
+
+
+    for(int i=0; i<arrSize; i++){
+        a[i]=i;
+        b[i] = i+3-4*1+i*4;
+    }
+
+    int *d_a, *d_b, *d_output;
+    cudaMalloc((void **) &d_a, byte_size);
+    cudaMalloc((void **) &d_output, byte_size);
+    cudaMalloc((void **) &d_b, byte_size);
+
+    cudaMemcpy(d_a, a, byte_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_b, b, byte_size, cudaMemcpyHostToDevice);
+
+    dim3 block(arrSize);
+    dim3 grid(1);
+
+    zip_p2 <<<grid, block>>> (d_a, d_b, d_output, arrSize);
+
+    cudaMemcpy(output, d_output, byte_size, cudaMemcpyDeviceToHost);
+
+    for(int i = 0; i<arrSize; i++){
+         printf("i: %d, a[i]: %d, b[i]: %d, out[i]: %d \n", i, a[i], b[i], output[i]);
+    }
+
+    free(a);
+    free(b);
+    free(output);
+
+    cudaFree(d_a);
+    cudaFree(d_b);
+    cudaFree(d_output);
+
+    cudaDeviceReset();
+    return 0;
+}
