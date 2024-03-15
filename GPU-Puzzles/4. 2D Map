@@ -1,0 +1,63 @@
+#include "cuda_runtime.h"
+#include <stdio.h>
+#include <vector>
+
+
+
+// puzzle 4 2d Map: Implement a kernel that adds 10 to each position of a and stores it in out. Input a is 2D and square. 
+// You have more threads than positions.
+__global__ void map_2d_p4(int *a, int *output, int size) {
+    int threadIndexX=blockIdx.x*blockDim.x+threadIdx.x;
+    int threadIndexY=blockIdx.y*blockDim.y + threadIdx.y;
+
+    if(threadIndexX<size && threadIndexY<size){
+        output[threadIndexY*size+threadIndexX] = a[threadIndexY*size+threadIndexX]+10;
+    }
+
+}
+
+int main() {
+    
+    int arrSize = 8;
+
+    //creating a vector a and the output
+    std::vector<std::vector<int>> a(arrSize, std::vector<int> (arrSize));
+    std::vector<std::vector<int>> output(arrSize, std::vector<int> (arrSize));
+
+    for (int i = 0; i < arrSize; i++) {
+        for (int j = 0; j < arrSize; j++) {
+            a[i][j]= i * j + j;
+        }
+    }
+    int *d_a, *d_output;
+    cudaMalloc((void **) &d_a, arrSize*arrSize*sizeof(int));
+    cudaMalloc((void **) &d_output, arrSize*arrSize*sizeof(int));
+
+
+    for(int i=0; i<arrSize; i++){
+        cudaMemcpy(&d_a[i*arrSize], a[i].data(), arrSize*sizeof(int), cudaMemcpyHostToDevice);
+    }
+
+    dim3 block(10, 10);
+    dim3 grid(1);
+
+    map_2d_p4 <<<grid, block>>> (d_a, d_output, arrSize);
+
+    for(int i=0; i<arrSize; i++){
+        cudaMemcpy(output[i].data(), &d_output[i*arrSize], arrSize*sizeof(int), cudaMemcpyDeviceToHost);
+    }
+    
+    for(int i = 0; i<arrSize; i++){
+        for(int j=0; j<arrSize; j++){
+            printf("i: %d, j: %d, a[i][j]: %d, out[i]: %d \n", i, j, a[i][j], output[i][j]);
+        }
+    }
+
+
+    cudaFree(d_a);
+    cudaFree(d_output);
+
+
+    cudaDeviceReset();
+    return 0;
+}
