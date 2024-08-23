@@ -1,0 +1,67 @@
+//Chase-Lev ULFD
+#include <iostream>
+#include <vector>
+#include <atomic>
+#include <memory>
+#include <stdexcept>
+
+template<typename T>
+class WorkStealingDeque {
+private:
+    ULFD<T> ulfd;                 // Underlying ULFD for dynamic memory management
+    std::atomic<size_t> topIdx;   // Top index for stealing
+    std::atomic<size_t> bottomIdx;// Bottom index for push/pop
+
+public:
+    WorkStealingDeque(size_t initialSize = 2)
+        : ulfd(initialSize), topIdx(0), bottomIdx(0) {}
+
+    // Push a task onto the bottom of the deque
+    void push(const T& task) {
+        size_t b = bottomIdx.load(std::memory_order_relaxed);
+        ulfd[b] = task;
+        bottomIdx.store(b + 1, std::memory_order_release);
+    }
+
+    // Pop a task from the bottom of the deque (for the owner thread)
+    bool pop(T& result) {
+        size_t b = bottomIdx.load(std::memory_order_relaxed) - 1;
+        bottomIdx.store(b, std::memory_order_relaxed);
+
+        size_t t = topIdx.load(std::memory_order_acquire);
+        if (t <= b) {  // Non-empty case
+            result = ulfd[b];
+            if (t == b) {  // Single element left
+                if (!topIdx.compare_exchange_strong(t, t + 1, std::memory_order_release, std::memory_order_relaxed)) {
+                    // Another thread stole the last element
+                    bottomIdx.store(b + 1, std::memory_order_relaxed);
+                    return false;
+                }
+            }
+            return true;
+        } else {  // Deque is empty
+            bottomIdx.store(b + 1, std::memory_order_relaxed);
+            return false;
+        }
+    }
+
+    bool steal(T& result) {
+        size_t t = topIdx.load(std::memory_order_acquire);
+        size_t b = bottomIdx.load(std::memory_order_acquire);
+
+        if (t < b) {  
+            result = ulfd[t];
+            if (!topIdx.compare_exchange_strong(t, t + 1, std::memory_order_release, std::memory_order_relaxed)) {
+                return false;  
+            }
+            return true;
+        } else {
+            return false;  
+        }
+    }
+
+    bool empty() const {
+        return topIdx.load(std::memory_order_acquire) >= bottomIdx.load(std::memory_order_acquire);
+    }
+};
+
